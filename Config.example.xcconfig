@@ -1,0 +1,8 @@
+#include? "Config.local.xcconfig"
+
+OPENROUTER_API_KEY =
+OPENROUTER_MODEL = deepseek/deepseek-v4-flash-0731
+OPENROUTER_STT_MODEL = openai/gpt-4o-mini-transcribe
+LIVEKIT_WS_URL =
+LIVEKIT_PARTICIPANT_TOKEN =
+
