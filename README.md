@@ -6,6 +6,9 @@
 
 当前为**客户端直连演示版**：密钥放在本机 `Config.local.xcconfig`，适合验证产品体验，不适合直接当生产架构。
 
+演示视频：https://drive.google.com/file/d/1-7Xj1grG4skVJMz06LQCWQGkbFydqbx1/view?usp=sharing 
+
+
 ---
 
 ## 功能一览
