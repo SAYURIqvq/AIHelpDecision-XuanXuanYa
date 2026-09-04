@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>OPENROUTER_API_KEY</key>
+	<string>$(OPENROUTER_API_KEY)</string>
+	<key>OPENROUTER_MODEL</key>
+	<string>$(OPENROUTER_MODEL)</string>
+	<key>OPENROUTER_VISION_MODEL</key>
+	<string>$(OPENROUTER_VISION_MODEL)</string>
+	<key>OPENROUTER_STT_MODEL</key>
+	<string>$(OPENROUTER_STT_MODEL)</string>
+	<key>LIVEKIT_WS_URL</key>
+	<string>$(LIVEKIT_WS_URL)</string>
+	<key>LIVEKIT_PARTICIPANT_TOKEN</key>
+	<string>$(LIVEKIT_PARTICIPANT_TOKEN)</string>
+</dict>
+</plist>

@@ -1,8 +1,8 @@
-#include? "Config.local.xcconfig"
-
 OPENROUTER_API_KEY =
-OPENROUTER_MODEL = deepseek/deepseek-v4-flash-0731
+OPENROUTER_MODEL = qwen/qwen3.5-flash-02-23
+OPENROUTER_VISION_MODEL = qwen/qwen3-vl-30b-a3b-instruct
 OPENROUTER_STT_MODEL = openai/gpt-4o-mini-transcribe
 LIVEKIT_WS_URL =
 LIVEKIT_PARTICIPANT_TOKEN =
 
+#include? "Config.local.xcconfig"

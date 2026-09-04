@@ -4,11 +4,13 @@ import SwiftUI
 struct RootView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var profiles: [UserProfile]
+    @StateObject private var chrome = AppChrome()
     @State private var showSplash = true
 
     var body: some View {
         ZStack {
             MainTabView()
+                .environmentObject(chrome)
                 .opacity(showSplash ? 0 : 1)
 
             if showSplash {
@@ -16,8 +18,17 @@ struct RootView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
             }
         }
+        .environmentObject(chrome)
+        .sheet(isPresented: $chrome.showGrainExhaustSheet) {
+            GrainExhaustSheet()
+                .environmentObject(chrome)
+        }
+        .alert(chrome.purchaseSuccessMessage, isPresented: $chrome.showPurchaseSuccess) {
+            Button("好鸭", role: .cancel) {}
+        }
         .onAppear {
             ensureProfile()
+            _ = GrainWalletService.ensureWallet(in: modelContext)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
                 withAnimation(.spring(response: 0.65, dampingFraction: 0.82)) {
                     showSplash = false
@@ -37,22 +48,38 @@ struct RootView: View {
 }
 
 struct MainTabView: View {
+    @EnvironmentObject private var chrome: AppChrome
+
     var body: some View {
-        TabView {
+        TabView(selection: Binding(
+            get: { chrome.selectedTab },
+            set: { chrome.selectedTab = $0 }
+        )) {
             ChatView()
                 .tabItem {
                     Label("聊天", systemImage: "bubble.left.and.bubble.right")
                 }
+                .tag(AppChrome.Tab.chat)
             CallView()
                 .tabItem {
                     Label("通话", systemImage: "phone.connection")
                 }
+                .tag(AppChrome.Tab.call)
+            RechargeCenterView()
+                .tabItem {
+                    Label("囤粮", systemImage: "leaf.circle.fill")
+                }
+                .tag(AppChrome.Tab.grain)
             ProfileView()
                 .tabItem {
                     Label("我的", systemImage: "person.crop.circle")
                 }
+                .tag(AppChrome.Tab.profile)
         }
         .tint(DuckTheme.duckOrange)
+        .onAppear {
+            DuckTheme.applyChromeAppearance()
+        }
     }
 }
 

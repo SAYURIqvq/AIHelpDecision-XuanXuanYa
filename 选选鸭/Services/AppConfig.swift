@@ -3,6 +3,7 @@ import Foundation
 struct AppConfig {
     let openRouterAPIKey: String
     let openRouterModel: String
+    let openRouterVisionModel: String
     let openRouterSTTModel: String
     let liveKitURL: String
     let liveKitToken: String
@@ -10,7 +11,8 @@ struct AppConfig {
     static var current: AppConfig {
         AppConfig(
             openRouterAPIKey: Bundle.main.configValue("OPENROUTER_API_KEY"),
-            openRouterModel: Bundle.main.configValue("OPENROUTER_MODEL", fallback: "deepseek/deepseek-v4-flash-0731"),
+            openRouterModel: Bundle.main.configValue("OPENROUTER_MODEL", fallback: "qwen/qwen3.5-flash-02-23"),
+            openRouterVisionModel: Bundle.main.configValue("OPENROUTER_VISION_MODEL", fallback: "qwen/qwen3-vl-30b-a3b-instruct"),
             openRouterSTTModel: Bundle.main.configValue("OPENROUTER_STT_MODEL", fallback: "openai/gpt-4o-mini-transcribe"),
             liveKitURL: Bundle.main.configValue("LIVEKIT_WS_URL"),
             liveKitToken: Bundle.main.configValue("LIVEKIT_PARTICIPANT_TOKEN")
