@@ -14,5 +14,13 @@
 	<string>$(LIVEKIT_WS_URL)</string>
 	<key>LIVEKIT_PARTICIPANT_TOKEN</key>
 	<string>$(LIVEKIT_PARTICIPANT_TOKEN)</string>
+	<key>DASHSCOPE_API_KEY</key>
+	<string>$(DASHSCOPE_API_KEY)</string>
+	<key>QWEN_OMNI_MODEL</key>
+	<string>$(QWEN_OMNI_MODEL)</string>
+	<key>QWEN_OMNI_VOICE</key>
+	<string>$(QWEN_OMNI_VOICE)</string>
+	<key>QWEN_OMNI_WS_URL</key>
+	<string>$(QWEN_OMNI_WS_URL)</string>
 </dict>
 </plist>

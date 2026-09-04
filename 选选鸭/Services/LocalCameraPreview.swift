@@ -9,7 +9,8 @@ final class LocalCameraPreviewController: NSObject, ObservableObject {
     @Published var isPrepared = false
 
     let session = AVCaptureSession()
-    private let sessionQueue = DispatchQueue(label: "com.xuanxuanya.local-camera")
+    /// 供抽帧等外部组件与摄像头开关串行，避免并发改 session 闪退
+    let sessionQueue = DispatchQueue(label: "com.xuanxuanya.local-camera")
     private var currentInput: AVCaptureDeviceInput?
     private var preferredPosition: AVCaptureDevice.Position = .front
 

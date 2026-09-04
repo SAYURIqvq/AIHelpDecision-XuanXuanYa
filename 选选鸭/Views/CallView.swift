@@ -122,7 +122,7 @@ private struct CallLobbyView: View {
 
                     CallModeCard(
                         title: "和鸭鸭打电话商量",
-                        subtitle: "实时语音通话 · \(GrainCosts.voiceCallPerMinute)谷粒/分钟",
+                        subtitle: "和鸭鸭打电话商量 · \(GrainCosts.voiceCallPerMinute)谷粒/分钟",
                         badge: "语音",
                         systemImage: "phone.fill",
                         gradient: [
@@ -134,7 +134,7 @@ private struct CallLobbyView: View {
 
                     CallModeCard(
                         title: "和鸭鸭打视频商量",
-                        subtitle: "实时视频 · 后置全屏对准选项 · \(GrainCosts.videoCallPerMinute)谷粒/分钟",
+                        subtitle: "实时视频 · 鸭鸭看得见选项 · \(GrainCosts.videoCallPerMinute)谷粒/分钟",
                         badge: "视频",
                         systemImage: "video.fill",
                         gradient: [
@@ -244,6 +244,8 @@ private struct ActiveCallScreen: View {
                 } else {
                     Spacer(minLength: 0)
                     videoCoachRow
+                        .fixedSize(horizontal: false, vertical: true)
+                        .layoutPriority(1)
                 }
 
                 callControls
@@ -277,33 +279,70 @@ private struct ActiveCallScreen: View {
             Text(viewModel.mode.title)
                 .font(.headline.weight(.heavy))
                 .foregroundStyle(.white)
-            HStack(spacing: 10) {
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            HStack(spacing: 8) {
                 Text(isConnecting ? "正在接通鸭鸭…" : viewModel.formattedElapsed)
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(.white.opacity(0.9))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 Text("·")
                     .foregroundStyle(.white.opacity(0.45))
                 Text("\(viewModel.mode.grainsPerMinute)谷粒/分钟")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(DuckTheme.warmYellow)
+                    .lineLimit(1)
+                if viewModel.usesOmniRealtime {
+                    Text("·")
+                        .foregroundStyle(.white.opacity(0.45))
+                    Text("鸭鸭在线")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Color(red: 0.55, green: 0.95, blue: 0.72))
+                        .lineLimit(1)
+                }
             }
+            .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity)
+        .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(.black.opacity(0.28))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var voiceCallContent: some View {
-        VStack(spacing: 28) {
+        VStack(spacing: 22) {
             PulsingDuckOrb(
-                title: isConnecting ? "鸭鸭来电中…" : "鸭鸭在听你说",
-                subtitle: isConnecting ? "叮咚叮咚，马上接听" : "把纠结说出来，一起商量拍板"
+                title: voiceOrbTitle,
+                subtitle: voiceOrbSubtitle
             )
-            VoiceWaveBars(active: !viewModel.isMuted && !isConnecting)
+            VoiceWaveBars(active: (!viewModel.isMuted && !isConnecting) || viewModel.isDuckSpeaking)
+            if !viewModel.assistantTranscript.isEmpty || !viewModel.userTranscript.isEmpty {
+                CallTranscriptPanel(
+                    userText: viewModel.userTranscript,
+                    duckText: viewModel.assistantTranscript,
+                    compact: false
+                )
+            }
         }
         .padding(.horizontal, 4)
+    }
+
+    private var voiceOrbTitle: String {
+        if isConnecting { return "鸭鸭来电中…" }
+        if viewModel.isDuckSpeaking { return "鸭鸭正在说…" }
+        if viewModel.isUserSpeaking { return "鸭鸭在听你说" }
+        return viewModel.usesOmniRealtime ? "和鸭鸭实时商量中" : "鸭鸭在听你说"
+    }
+
+    private var voiceOrbSubtitle: String {
+        if isConnecting { return "叮咚叮咚，马上接听" }
+        if !viewModel.turnHint.isEmpty { return viewModel.turnHint }
+        if viewModel.isDuckSpeaking { return "点「打断」或清楚说话，就能插话" }
+        if viewModel.isUserSpeaking { return "说完稍停一下，鸭鸭就接上" }
+        return viewModel.usesOmniRealtime ? "把纠结说出来，鸭鸭用声音帮你拍板" : "把纠结说出来，一起商量拍板"
     }
 
     /// 全屏本机摄像头底层
@@ -330,32 +369,68 @@ private struct ActiveCallScreen: View {
         }
     }
 
-    /// 放在控制栏上方，避免和挂断按钮重叠
     private var videoCoachRow: some View {
-        HStack(alignment: .bottom, spacing: 10) {
-            FloatingDuckCoach(
-                isConnecting: isConnecting,
-                cameraOn: viewModel.cameraEnabled
-            )
-            Spacer(minLength: 8)
-            Text(viewModel.usingFrontCamera ? "前置" : "后置 · 对准选项")
-                .font(.caption2.weight(.black))
-                .foregroundStyle(viewModel.usingFrontCamera ? .white : DuckTheme.inkBlue)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(viewModel.usingFrontCamera ? Color.black.opacity(0.35) : DuckTheme.warmYellow)
-                .clipShape(Capsule())
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 10) {
+                FloatingDuckCoach(
+                    isConnecting: isConnecting,
+                    cameraOn: viewModel.cameraEnabled,
+                    isSpeaking: viewModel.isDuckSpeaking,
+                    subtitle: videoCoachSubtitle
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(viewModel.usingFrontCamera ? "前置" : "后置 · 对准选项")
+                    .font(.caption2.weight(.black))
+                    .foregroundStyle(viewModel.usingFrontCamera ? .white : DuckTheme.inkBlue)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: 92)
+                    .background(viewModel.usingFrontCamera ? Color.black.opacity(0.35) : DuckTheme.warmYellow)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+
+            if !viewModel.assistantTranscript.isEmpty || !viewModel.userTranscript.isEmpty {
+                CallTranscriptPanel(
+                    userText: viewModel.userTranscript,
+                    duckText: viewModel.assistantTranscript,
+                    compact: true
+                )
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var videoCoachSubtitle: String {
+        if isConnecting { return "正在接通…" }
+        if !viewModel.turnHint.isEmpty { return viewModel.turnHint }
+        if viewModel.isDuckSpeaking { return "点「打断」可插话" }
+        if viewModel.isUserSpeaking { return "在听你说" }
+        return viewModel.usesOmniRealtime ? "对准选项，鸭鸭看得见" : "把纠结对准镜头"
     }
 
     private var callControls: some View {
-        HStack(spacing: 18) {
+        HStack(spacing: 12) {
             CallControlButton(
                 systemImage: viewModel.isMuted ? "mic.slash.fill" : "mic.fill",
                 label: viewModel.isMuted ? "已静音" : "静音",
                 tint: viewModel.isMuted ? DuckTheme.duckOrange : .white.opacity(0.18)
             ) {
                 Task { await viewModel.setMuted(!viewModel.isMuted) }
+            }
+
+            if viewModel.showsTurnControl {
+                CallControlButton(
+                    systemImage: viewModel.turnControlSymbol,
+                    label: viewModel.turnControlLabel,
+                    tint: turnControlTint,
+                    emphasized: viewModel.canInterruptNow
+                ) {
+                    viewModel.interruptDuckSpeaking()
+                }
             }
 
             if viewModel.mode == .video {
@@ -389,6 +464,51 @@ private struct ActiveCallScreen: View {
         .padding(.vertical, 14)
         .background(.black.opacity(0.28))
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .animation(.easeInOut(duration: 0.18), value: viewModel.canInterruptNow)
+        .animation(.easeInOut(duration: 0.18), value: viewModel.isUserSpeaking)
+    }
+
+    private var turnControlTint: Color {
+        if viewModel.canInterruptNow {
+            return DuckTheme.warmYellow.opacity(0.95)
+        }
+        if viewModel.isUserSpeaking {
+            return Color(red: 0.28, green: 0.78, blue: 0.58).opacity(0.95)
+        }
+        return .white.opacity(0.18)
+    }
+}
+
+private struct CallTranscriptPanel: View {
+    let userText: String
+    let duckText: String
+    var compact: Bool = false
+
+    private var maxHeight: CGFloat { compact ? 180 : 220 }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 6) {
+                if !userText.isEmpty {
+                    Text("你：\(userText)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(compact ? 0.85 : 0.78))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if !duckText.isEmpty {
+                    Text("鸭鸭：\(duckText)")
+                        .font(compact ? .caption.weight(.bold) : .subheadline.weight(.bold))
+                        .foregroundStyle(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxHeight: maxHeight)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(compact ? 12 : 14)
+        .background(compact ? Color.black.opacity(0.42) : Color.white.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: compact ? 14 : 16, style: .continuous))
     }
 }
 
@@ -423,45 +543,68 @@ private struct FullscreenLocalCamera: View {
 private struct FloatingDuckCoach: View {
     var isConnecting: Bool
     var cameraOn: Bool
+    var isSpeaking: Bool = false
+    var subtitle: String? = nil
 
     @State private var bob = false
     @State private var glow = false
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 10) {
+        HStack(alignment: .center, spacing: 10) {
             ZStack {
                 Circle()
-                    .stroke(DuckTheme.warmYellow.opacity(glow ? 0.15 : 0.7), lineWidth: 2)
-                    .frame(width: glow ? 78 : 64, height: glow ? 78 : 64)
+                    .stroke(DuckTheme.warmYellow.opacity(glow ? 0.2 : 0.75), lineWidth: 2)
+                    .frame(width: 64, height: 64)
+                    .scaleEffect(glow ? 1.18 : 1.0)
                 Image("MascotChat")
                     .resizable()
                     .scaledToFill()
                     .frame(width: 56, height: 56)
                     .clipShape(Circle())
                     .overlay(Circle().stroke(.white, lineWidth: 2))
-                    .offset(y: bob ? -4 : 3)
+                    .offset(y: bob ? -3 : 2)
             }
+            // 给呼吸光圈和上下浮动留足空间，避免被父级裁切
+            .frame(width: 76, height: 76)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(isConnecting ? "鸭鸭接通中…" : "鸭鸭陪你看")
+                Text(coachTitle)
                     .font(.subheadline.weight(.heavy))
                     .foregroundStyle(.white)
-                Text(cameraOn ? "把选项对准镜头，说说你的纠结" : "打开摄像头，鸭鸭才能帮你看鸭")
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Text(coachSubtitle)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.82))
-                    .lineLimit(2)
+                    .foregroundStyle(.white.opacity(0.88))
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(.black.opacity(0.42))
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
                 bob = true
                 glow = true
             }
         }
+    }
+
+    private var coachTitle: String {
+        if isConnecting { return "鸭鸭接通中…" }
+        if isSpeaking { return "鸭鸭正在说" }
+        return "鸭鸭陪你看"
+    }
+
+    private var coachSubtitle: String {
+        if let subtitle, !subtitle.isEmpty { return subtitle }
+        return cameraOn ? "把选项对准镜头，说说你的纠结" : "打开摄像头，鸭鸭才能帮你看鸭"
     }
 }
 
@@ -470,24 +613,46 @@ private struct CallControlButton: View {
     let label: String
     let tint: Color
     var large: Bool = false
+    var emphasized: Bool = false
     let action: () -> Void
+
+    @State private var pulse = false
 
     var body: some View {
         Button(action: action) {
             VStack(spacing: 6) {
-                Image(systemName: systemImage)
-                    .font(large ? .title2.weight(.bold) : .body.weight(.bold))
-                    .foregroundStyle(.white)
-                    .frame(width: large ? 68 : 52, height: large ? 68 : 52)
-                    .background(tint)
-                    .clipShape(Circle())
+                ZStack {
+                    if emphasized {
+                        Circle()
+                            .stroke(DuckTheme.warmYellow.opacity(pulse ? 0.15 : 0.65), lineWidth: 2)
+                            .frame(width: pulse ? 64 : 56, height: pulse ? 64 : 56)
+                    }
+                    Image(systemName: systemImage)
+                        .font(large ? .title2.weight(.bold) : .body.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(width: large ? 68 : 52, height: large ? 68 : 52)
+                        .background(tint)
+                        .clipShape(Circle())
+                }
                 Text(label)
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.white.opacity(0.9))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
+        .onAppear { pulse = emphasized }
+        .onChange(of: emphasized) { _, on in
+            pulse = on
+        }
+        .animation(
+            emphasized
+                ? .easeInOut(duration: 0.85).repeatForever(autoreverses: true)
+                : .default,
+            value: pulse
+        )
     }
 }
 

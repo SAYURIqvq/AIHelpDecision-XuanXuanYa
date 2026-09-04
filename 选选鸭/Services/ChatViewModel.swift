@@ -365,25 +365,39 @@ final class ChatViewModel: ObservableObject {
             streamingText = assistant.text
             assistant.interactionKind = parsed.kind
 
-            switch parsed.kind {
-            case .decision:
-                if let response = parsed.response {
-                    applyDecision(response, to: assistant)
-                    activeDecisionMessageID = assistant.id
-                }
+            // 用户已是「A还是B」拍板句，但模型误给续聊芯片/没给按钮 → 首轮强制补决策选项
+            if let forced = UserChoiceIntent.fallbackDecision(
+                userPrompt: userMessage.displayText,
+                displayText: assistant.text,
+                parsedKind: parsed.kind
+            ) {
+                applyDecision(forced, to: assistant)
+                activeDecisionMessageID = assistant.id
                 if !assistant.text.contains("纠结好了吗") {
                     assistant.text += "\n\n纠结好了吗？点下方按钮确认最终决定鸭～确认后才会记入决策历史哦 💛"
                     streamingText = assistant.text
                 }
-            case .chips:
-                assistant.optionsRaw = parsed.chipOptions.joined(separator: "|||")
-                assistant.recommendationRaw = ""
-                assistant.decisionTitle = ""
-                assistant.reasonSummary = ""
-                activeDecisionMessageID = nil
-            case .none:
-                assistant.optionsRaw = ""
-                activeDecisionMessageID = nil
+            } else {
+                switch parsed.kind {
+                case .decision:
+                    if let response = parsed.response {
+                        applyDecision(response, to: assistant)
+                        activeDecisionMessageID = assistant.id
+                    }
+                    if !assistant.text.contains("纠结好了吗") {
+                        assistant.text += "\n\n纠结好了吗？点下方按钮确认最终决定鸭～确认后才会记入决策历史哦 💛"
+                        streamingText = assistant.text
+                    }
+                case .chips:
+                    assistant.optionsRaw = parsed.chipOptions.joined(separator: "|||")
+                    assistant.recommendationRaw = ""
+                    assistant.decisionTitle = ""
+                    assistant.reasonSummary = ""
+                    activeDecisionMessageID = nil
+                case .none:
+                    assistant.optionsRaw = ""
+                    activeDecisionMessageID = nil
+                }
             }
             assistant.isIncomplete = false
             try modelContext.save()

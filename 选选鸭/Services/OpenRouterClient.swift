@@ -89,6 +89,28 @@ actor OpenRouterClient {
 
         先判断用户意图，再决定要不要给按钮：
 
+        【B 真正在纠结拍板】（最高优先！）
+        一旦用户本句是在二选一/多选一拍板，必须走决策，禁止用续聊芯片搪塞：
+        - 典型句式：A还是B、要不要、该不该、选哪个、吃X还是吃Y、买A还是买B
+        - 例：「吃鸡蛋还是吃包子」→ 立刻给「吃鸡蛋 / 吃包子」决策按钮，不要改问「要不要鸡蛋做法」这类话题
+        - 正文用决策格式：
+        🦆 鸭鸭建议：...
+        ✨ 理由：...
+        👉 下一步：...
+        然后温柔问：纠结好了吗？点下方按钮确认最终决定鸭～确认后才会记入决策历史哦。
+        - 正文结束后必须追加（第一轮就要有，不要等用户再问一次）：
+        <<<OPTIONS>>>
+        {"title":"简短决策标题","recommendation":"明确推荐且必须是 options 之一","reason":"一句话理由摘要","options":["🍜 用户真实选项A","🥗 用户真实选项B"]}
+        <<<END>>>
+        - options 必须来自用户真实选项，至少 2 个、最多 4 个（不含「我还没有纠结好」）；每个选项前面加一个贴切 emoji。
+        - 每个 option = 一个互斥结果。全场景通用硬规则：
+          1) 禁止近义/换说法重复（如「不带耳机用免提」和「不带耳机，直接用免提」只能留一个）
+          2) 禁止同一结果再加括号/破折号/冒号注解当成新选项（如「花菜」和「花菜 (健康软糯)」、「方案A」和「方案A：稳妥版」）
+          3) 禁止把推荐短名和完整选项同时塞进 options
+          4) 对立选项要保留（如「去」和「不去」、「带」和「不带」）
+        - recommendation 必须原样复制某一个 option（含 emoji），禁止另写短名或近义句。
+        - 严禁：用户已在 A/B 拍板时，却输出 <<<CHIPS>>> 去问做法/话题/下一步闲聊。
+
         【A 闲聊 / 提问求教 / 陪伴 / 找话题】
         - 正常聊天即可，不要逼用户做最终决定。
         - 不要输出「纠结好了吗」，不要记决策。
@@ -102,26 +124,8 @@ actor OpenRouterClient {
           3) 芯片要短、可一点就发出去当用户下一句，每条前加贴切 emoji；彼此意思不要重复。
           4) 只有用户明确说「随便聊聊 / 换个话题 / 不知道聊啥」时，才给开阔找话题的芯片。
 
-        【B 真正在纠结拍板】（如 A还是B、要不要、买哪个、选哪条路）
-        - 才用决策格式：
-        🦆 鸭鸭建议：...
-        ✨ 理由：...
-        👉 下一步：...
-        然后温柔问：纠结好了吗？点下方按钮确认最终决定鸭～确认后才会记入决策历史哦。
-        - 正文结束后必须追加：
-        <<<OPTIONS>>>
-        {"title":"简短决策标题","recommendation":"明确推荐且必须是 options 之一","reason":"一句话理由摘要","options":["🍜 用户真实选项A","🥗 用户真实选项B"]}
-        <<<END>>>
-        - options 必须来自用户真实选项，至少 2 个、最多 4 个（不含「我还没有纠结好」）；每个选项前面加一个贴切 emoji。
-        - 每个 option = 一个互斥结果。全场景通用硬规则：
-          1) 禁止近义/换说法重复（如「不带耳机用免提」和「不带耳机，直接用免提」只能留一个）
-          2) 禁止同一结果再加括号/破折号/冒号注解当成新选项（如「花菜」和「花菜 (健康软糯)」、「方案A」和「方案A：稳妥版」）
-          3) 禁止把推荐短名和完整选项同时塞进 options
-          4) 对立选项要保留（如「去」和「不去」、「带」和「不带」）
-        - recommendation 必须原样复制某一个 option（含 emoji），禁止另写短名或近义句。
-
-        重要：续聊递进用 CHIPS；真正二选一拍板用 OPTIONS。两者不要同时出现。
-        用户只是问怎么做/求建议/继续聊时，用 CHIPS，绝不要用 OPTIONS。
+        重要：续聊递进用 CHIPS；真正二选一拍板用 OPTIONS。两者不要同时出现；若冲突，只保留 OPTIONS。
+        用户只是问怎么做/求建议/继续聊、且没有 A还是B 这类拍板句时，用 CHIPS，绝不要用 OPTIONS。
         若用户消息里带有【用户正在引用/回复 …】，说明用户在针对某句前文回复，请结合被引用内容回应。
         """
 
@@ -562,18 +566,7 @@ enum DecisionStreamParser {
     }
 
     static func parse(_ full: String) -> ParseResult {
-        if let chips = parseBlock(full, startMarker: "<<<CHIPS>>>", endMarker: "<<<END>>>") {
-            let options = dedupeOptions(chips.payload.options ?? [])
-            if !options.isEmpty {
-                return ParseResult(
-                    displayText: chips.display,
-                    kind: .chips,
-                    response: nil,
-                    chipOptions: options
-                )
-            }
-        }
-
+        // OPTIONS 优先：模型偶发同时吐 CHIPS+OPTIONS 时，以拍板按钮为准
         if let decision = parseBlock(full, startMarker: "<<<OPTIONS>>>", endMarker: "<<<END>>>") {
             var options = dedupeOptions(decision.payload.options ?? [])
             let rawRecommendation = (decision.payload.recommendation ?? "")
@@ -610,6 +603,18 @@ enum DecisionStreamParser {
                 )
             }
             return ParseResult(displayText: decision.display, kind: .none, response: nil, chipOptions: [])
+        }
+
+        if let chips = parseBlock(full, startMarker: "<<<CHIPS>>>", endMarker: "<<<END>>>") {
+            let options = dedupeOptions(chips.payload.options ?? [])
+            if !options.isEmpty {
+                return ParseResult(
+                    displayText: chips.display,
+                    kind: .chips,
+                    response: nil,
+                    chipOptions: options
+                )
+            }
         }
 
         return ParseResult(
@@ -831,6 +836,132 @@ enum DecisionStreamParser {
             return (display, Payload(title: nil, recommendation: nil, reason: nil, options: nil))
         }
         return (display, payload)
+    }
+}
+
+/// 从用户原话识别「A还是B」类拍板意图，用于首轮强制出决策按钮。
+enum UserChoiceIntent {
+    static func isClearDecisionPrompt(_ raw: String) -> Bool {
+        let text = normalize(raw)
+        guard text.count >= 4 else { return false }
+        if text.contains("还是") { return true }
+        if text.contains("选哪个") || text.contains("选哪一个") || text.contains("选哪") { return true }
+        if text.range(of: #"要不要|该不该|可不可以|行不行|好不好"#, options: .regularExpression) != nil {
+            return true
+        }
+        if text.contains("或者"), text.count <= 40 {
+            return true
+        }
+        return false
+    }
+
+    /// 从用户话里拆出可点选项；拆不出则返回空。
+    static func extractOptions(from raw: String) -> [String] {
+        var text = normalize(raw)
+        for suffix in ["？", "?", "呢", "啊", "呀", "吗", "嘛", "啦"] {
+            if text.hasSuffix(suffix) {
+                text = String(text.dropLast(suffix.count))
+            }
+        }
+        text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if text.contains("还是") {
+            let parts = text
+                .components(separatedBy: "还是")
+                .map { cleanOptionPiece($0) }
+                .filter { !$0.isEmpty && $0.count <= 24 }
+            if parts.count >= 2 {
+                return Array(dedupe(parts).prefix(4)).map(decorateEmoji)
+            }
+        }
+
+        if text.contains("或者") {
+            let parts = text
+                .components(separatedBy: "或者")
+                .map { cleanOptionPiece($0) }
+                .filter { !$0.isEmpty && $0.count <= 24 }
+            if parts.count >= 2 {
+                return Array(dedupe(parts).prefix(4)).map(decorateEmoji)
+            }
+        }
+
+        if text.range(of: #"要不要|该不该|可不可以|行不行|好不好"#, options: .regularExpression) != nil {
+            let topic = text
+                .replacingOccurrences(of: #"要不要|该不该|可不可以|行不行|好不好"#, with: "", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !topic.isEmpty, topic.count <= 20 {
+                return [decorateEmoji("要\(topic)"), decorateEmoji("先不\(topic)")]
+            }
+            return ["👍 要", "🙅 先不要"]
+        }
+
+        return []
+    }
+
+    /// 用户明显在拍板，但模型给了续聊芯片/没给按钮时，补一套决策 OPTIONS。
+    static func fallbackDecision(
+        userPrompt: String,
+        displayText: String,
+        parsedKind: MessageInteractionKind
+    ) -> DecisionResponse? {
+        guard isClearDecisionPrompt(userPrompt) else { return nil }
+        guard parsedKind != .decision else { return nil }
+        let options = extractOptions(from: userPrompt)
+        guard options.count >= 2 else { return nil }
+        return DecisionResponse(
+            recommendation: options[0],
+            reason: displayText,
+            nextStep: "点选下方最终决定",
+            title: "帮你拍板",
+            options: options
+        )
+    }
+
+    private static func normalize(_ raw: String) -> String {
+        raw
+            .replacingOccurrences(of: #"【用户正在引用[\s\S]*?】用户新说】\n?"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"【用户正在引用/回复[\s\S]*?】\n?"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"「[^」]*」\n?"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func cleanOptionPiece(_ piece: String) -> String {
+        var s = piece.trimmingCharacters(in: .whitespacesAndNewlines)
+        // 去掉句首口语填充
+        for prefix in ["那", "嗯", "我是", "我想", "我该", "早上", "中午", "晚上", "今天", "明天"] {
+            // 只剥「早上吃鸡蛋」里过长语境时保留动词：不在这里粗暴删「早上」
+            _ = prefix
+        }
+        // 「请问吃鸡蛋」→「吃鸡蛋」
+        for prefix in ["请问", "想问", "纠结", "帮我选", "帮我看看"] {
+            if s.hasPrefix(prefix) {
+                s = String(s.dropFirst(prefix.count))
+            }
+        }
+        return s.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func dedupe(_ items: [String]) -> [String] {
+        DecisionStreamParser.dedupeOptions(items)
+    }
+
+    private static func decorateEmoji(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = trimmed.unicodeScalars.first else { return trimmed }
+        // 已有 emoji 则不加
+        if first.properties.isEmoji, first.value >= 0x2600 {
+            return trimmed
+        }
+        let lower = trimmed.lowercased()
+        if lower.contains("蛋") { return "🥚 \(trimmed)" }
+        if lower.contains("包子") || lower.contains("馒头") { return "🥟 \(trimmed)" }
+        if lower.contains("面") { return "🍜 \(trimmed)" }
+        if lower.contains("饭") { return "🍚 \(trimmed)" }
+        if lower.contains("买") || lower.contains("不买") { return "🛒 \(trimmed)" }
+        if lower.contains("去") || lower.contains("不去") { return "🚶 \(trimmed)" }
+        if lower.hasPrefix("要") { return "👍 \(trimmed)" }
+        if lower.hasPrefix("先不") || lower.hasPrefix("不") { return "🙅 \(trimmed)" }
+        return "✨ \(trimmed)"
     }
 }
 

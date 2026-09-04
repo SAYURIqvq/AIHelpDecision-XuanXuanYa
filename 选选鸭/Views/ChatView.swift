@@ -834,15 +834,24 @@ private struct DecisionOptionsView: View {
                         .background(Color(red: 0.90, green: 0.91, blue: 0.93))
                         .clipShape(Capsule())
                 }
+                Spacer(minLength: 0)
             }
 
-            VStack(spacing: 10) {
-                ForEach(Array(displayOptions.enumerated()), id: \.offset) { index, option in
-                    optionButton(option, index: index)
+            // 过期选项收成一行，避免旧「话题芯片」占满屏幕、看起来像当前选择
+            if isExpired {
+                Text(kind == .chips ? "你后来另开了话题，这些续聊入口已过期" : "你后来继续聊了，当时未确认决定")
+                    .font(.caption)
+                    .foregroundStyle(DuckTheme.mutedText.opacity(0.85))
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(Array(displayOptions.enumerated()), id: \.offset) { index, option in
+                        optionButton(option, index: index)
+                    }
                 }
             }
         }
-        .padding(14)
+        .padding(isExpired ? 12 : 14)
         .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
